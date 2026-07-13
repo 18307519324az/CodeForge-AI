@@ -72,7 +72,73 @@ jobs:
         run: npm ci
       - name: Release gate tests
         run: node --test scripts/release/**/*.test.mjs
+      - name: Database script tests
+        shell: pwsh
+        run: |
+          ./scripts/db/bootstrap-fresh-database.Tests.ps1
+          ./scripts/db/check-local-schema.Tests.ps1
       - name: Compliance scan
         run: bash scripts/check-compliance.sh
       - name: Diff whitespace check
         run: git diff --check
+
+  fresh-bootstrap:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_codeforge_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci_codeforge_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_NAME: codeforge_ai_ci_fresh
+      DB_USERNAME: root
+      DB_PASSWORD: ci_codeforge_password
+      CODEFORGE_FORCE_RULE_ONLY: "true"
+      AI_PROVIDER: rule
+      OPENAI_API_KEY: ""
+      DEEPSEEK_API_KEY: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install -y mysql-client
+      - name: Fresh bootstrap
+        shell: pwsh
+        run: |
+          ./scripts/db/bootstrap-fresh-database.ps1 -ConfirmCreate
+      - name: Schema gate
+        shell: pwsh
+        run: |
+          ./scripts/db/check-local-schema.ps1
+      - name: Assert Flyway baseline history
+        shell: bash
+        run: |
+          set -euo pipefail
+          export MYSQL_PWD="$DB_PASSWORD"
+          baseline_count="$(mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USERNAME" -N -B -D "$DB_NAME" -e "SELECT COUNT(*) FROM flyway_schema_history WHERE version='33' AND type='SQL_BASELINE' AND script='B33__codeforge_mysql_schema.sql' AND success=1")"
+          v1_count="$(mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USERNAME" -N -B -D "$DB_NAME" -e "SELECT COUNT(*) FROM flyway_schema_history WHERE script LIKE 'V1__%' AND success=1")"
+          test "$baseline_count" = "1"
+          test "$v1_count" = "0"
+      - name: Fresh bootstrap idempotency
+        shell: pwsh
+        run: |
+          ./scripts/db/bootstrap-fresh-database.ps1 -ConfirmCreate

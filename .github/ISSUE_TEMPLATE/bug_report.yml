@@ -1,35 +1,37 @@
 name: Bug report
-description: 报告可复现的问题
+description: Report a reproducible non-security defect.
 title: "[Bug] "
 labels: ["bug"]
 body:
+  - type: markdown
+    attributes:
+      value: Do not paste real secrets, tokens, cookies, personal data, storage paths, or complete system prompts. Use the private vulnerability reporting link for security issues.
   - type: textarea
     id: summary
     attributes:
-      label: 问题概述
+      label: Summary
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: 复现步骤
-      description: 请不要粘贴真实密钥、Token、Cookie、用户隐私数据或完整系统 Prompt。
+      label: Reproduction steps
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: 预期行为
+      label: Expected behavior
     validations:
       required: true
   - type: textarea
     id: actual
     attributes:
-      label: 实际行为
+      label: Actual behavior
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: 版本或 commit
-      placeholder: v1.0.0
+      label: Version or commit
+      placeholder: v1.0.1

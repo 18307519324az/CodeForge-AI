@@ -21,12 +21,13 @@ const markdownFiles = [
 const requiredImages = [
   'docs/images/01-home-workbench.webp',
   'docs/images/02-generation-workbench.webp',
-  'docs/images/03-artifact-preview.webp',
-  'docs/images/04-marketplace.webp',
-  'docs/images/05-admin-overview.webp',
-  'docs/images/06-provider-routing.webp',
-  'docs/images/07-prompt-versioning.webp',
-  'docs/images/08-model-call-audit.webp',
+  'docs/images/03-generated-site-preview.webp',
+  'docs/images/04-artifact-workbench.webp',
+  'docs/images/05-marketplace.webp',
+  'docs/images/06-admin-overview.webp',
+  'docs/images/07-provider-routing.webp',
+  'docs/images/08-prompt-versioning.webp',
+  'docs/images/09-model-call-audit.webp',
   'docs/images/codeforge-overview.webp',
   'docs/images/social-preview.png',
   'frontend/public/brand/codeforge-mascot.png',
@@ -94,6 +95,8 @@ test('README keeps professional release presentation constraints', () => {
   const readme = read('README.md')
   assert.match(readme, /\[English]\(README\.en\.md\)/)
   assert.match(readme, /docs\/images\/codeforge-overview\.webp/)
+  assert.match(readme, /docs\/images\/03-generated-site-preview\.webp/)
+  assert.match(readme, /bootstrap-fresh-database\.ps1/)
   assert.match(readme, /```mermaid/)
   assert.equal((readme.match(/img\.shields\.io/g) || []).length <= 8, true)
   assert.equal(/aiAvatar\.png|logo\.png|favicon\.ico/.test(readme), false)
@@ -106,4 +109,53 @@ test('documentation does not reference removed legacy assets or real secrets', (
   assert.equal(/aiAvatar\.png|logo\.png|favicon\.ico/.test(combined), false)
   assert.equal(sensitiveTokenPattern.test(combined), false)
   assert.equal(windowsUserPathPattern.test(combined), false)
+  assert.equal(/Fresh(?: DB| Database)?[\s\S]{0,160}apply-local-migrations\.ps1/i.test(combined), false)
+  assert.equal(/apply-local-migrations\.ps1[\s\S]{0,160}(?:initialize|bootstrap) Fresh/i.test(combined), false)
+  assert.match(read('SECURITY.md'), /security\/advisories\/new/)
+  assert.equal(existsSync(path.join(projectRoot, '.github/ISSUE_TEMPLATE/security_review.yml')), false)
+})
+
+test('Chinese and English README keep required section parity', () => {
+  const zh = read('README.md')
+  const en = read('README.en.md')
+  for (const marker of [
+    'Product Overview',
+    'Generated Website Preview',
+    'Core Capabilities',
+    'Role Matrix',
+    'Architecture',
+    'Generation Flow',
+    'Security Model',
+    'Quick Start',
+    'Fresh Database Bootstrap',
+    'Provider Configuration',
+    'Tests',
+    'Project Layout',
+    'Known Limitations',
+    'Roadmap',
+    'License',
+    'Maintainer',
+  ]) {
+    assert.match(en, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  }
+  for (const marker of [
+    '产品概览',
+    '真实生成网站预览',
+    '核心能力',
+    '角色矩阵',
+    '架构',
+    '生成流程',
+    '安全模型',
+    '快速开始',
+    'Fresh Database Bootstrap',
+    'Provider 配置',
+    '测试',
+    '项目结构',
+    '已知限制',
+    '路线图',
+    '许可证',
+    '维护者',
+  ]) {
+    assert.match(zh, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  }
 })
