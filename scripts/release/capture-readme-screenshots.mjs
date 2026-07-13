@@ -105,7 +105,61 @@ function eventPayload(event) {
   return {}
 }
 
-async function createGeneratedWebsite(userToken) {
+async function findModelCallForTask(adminToken, taskId) {
+  const logs = await api(adminToken, '/admin/model-call-logs?pageNo=1&pageSize=20')
+  const records = Array.isArray(logs?.records) ? logs.records : []
+  return records.find((record) => String(record.taskId) === String(taskId)) || null
+}
+
+async function assertDeepSeekAiDirect(adminToken, taskId) {
+  const modelCall = await findModelCallForTask(adminToken, taskId)
+  if (!modelCall) {
+    throw new Error('generated preview model call evidence missing')
+  }
+  if (!String(modelCall.generationSource || '').startsWith('AI_DIRECT')) {
+    throw new Error(`generated preview did not use AI_DIRECT: ${modelCall.generationSource || 'UNKNOWN'}`)
+  }
+  if (modelCall.fallbackUsed) {
+    throw new Error('generated preview used fallback output')
+  }
+  if (modelCall.providerCode !== 'deepseek') {
+    throw new Error(`generated preview did not use deepseek: ${modelCall.providerCode || 'UNKNOWN'}`)
+  }
+  return modelCall
+}
+
+async function buildGeneratedEvidence(userToken, adminToken, appId, taskId, versionId, versionNo) {
+  const files = await api(userToken, `/apps/${encodeURIComponent(appId)}/versions/${encodeURIComponent(versionId)}/files`)
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new Error('generated version has no files')
+  }
+  const preview = await api(userToken, `/apps/${encodeURIComponent(appId)}/versions/${encodeURIComponent(versionId)}/preview-token`, {
+    method: 'POST',
+  })
+  if (!preview?.previewUrl) {
+    throw new Error('preview token response missing previewUrl')
+  }
+  const previewTokenMatch = preview.previewUrl.match(/[?&]previewToken=([^&]+)/)
+  if (!previewTokenMatch) {
+    throw new Error('preview token response missing previewToken')
+  }
+  const modelCall = await assertDeepSeekAiDirect(adminToken, taskId)
+  return {
+    appId: String(appId),
+    taskId: String(taskId),
+    versionId: String(versionId),
+    versionNo: versionNo || null,
+    fileCount: files.length,
+    generationSource: modelCall.generationSource,
+    fallbackUsed: modelCall.fallbackUsed,
+    providerCode: modelCall.providerCode,
+    modelName: modelCall.modelName || null,
+    previewUrl: preview.previewUrl,
+    previewToken: decodeURIComponent(previewTokenMatch[1]),
+  }
+}
+
+async function createGeneratedWebsite(userToken, adminToken) {
   const suffix = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
   const workspace = await api(userToken, '/workspaces/default', { method: 'POST' })
   const app = await api(userToken, '/apps', {
@@ -156,29 +210,20 @@ async function createGeneratedWebsite(userToken) {
   if (!versionId) {
     throw new Error('generation success event missing versionId')
   }
-  const files = await api(userToken, `/apps/${encodeURIComponent(app.id)}/versions/${encodeURIComponent(versionId)}/files`)
-  if (!Array.isArray(files) || files.length === 0) {
-    throw new Error('generated version has no files')
+  return buildGeneratedEvidence(userToken, adminToken, app.id, taskId, versionId, payload.versionNo)
+}
+
+async function resolveGeneratedWebsite(userToken, adminToken) {
+  const existingAppId = (process.env.CODEFORGE_SCREENSHOT_EXISTING_APP_ID || '').trim()
+  const existingTaskId = (process.env.CODEFORGE_SCREENSHOT_EXISTING_TASK_ID || '').trim()
+  const existingVersionId = (process.env.CODEFORGE_SCREENSHOT_EXISTING_VERSION_ID || '').trim()
+  if (existingAppId || existingTaskId || existingVersionId) {
+    if (!existingAppId || !existingTaskId || !existingVersionId) {
+      throw new Error('existing generated preview requires appId, taskId, and versionId')
+    }
+    return buildGeneratedEvidence(userToken, adminToken, existingAppId, existingTaskId, existingVersionId, null)
   }
-  const preview = await api(userToken, `/apps/${encodeURIComponent(app.id)}/versions/${encodeURIComponent(versionId)}/preview-token`, {
-    method: 'POST',
-  })
-  if (!preview?.previewUrl) {
-    throw new Error('preview token response missing previewUrl')
-  }
-  const previewTokenMatch = preview.previewUrl.match(/[?&]previewToken=([^&]+)/)
-  if (!previewTokenMatch) {
-    throw new Error('preview token response missing previewToken')
-  }
-  return {
-    appId: String(app.id),
-    taskId: String(taskId),
-    versionId,
-    versionNo: payload.versionNo || null,
-    fileCount: files.length,
-    previewUrl: preview.previewUrl,
-    previewToken: decodeURIComponent(previewTokenMatch[1]),
-  }
+  return createGeneratedWebsite(userToken, adminToken)
 }
 
 async function setToken(page, token) {
@@ -322,7 +367,7 @@ async function main() {
     readRequiredEnv('CODEFORGE_SCREENSHOT_USER_B_PASSWORD'),
     'Demo User B',
   )
-  const generated = await createGeneratedWebsite(userToken)
+  const generated = await resolveGeneratedWebsite(userToken, adminToken)
   const { appId, versionId } = generated
 
   const browser = await chromium.launch({ headless: true })
@@ -377,6 +422,10 @@ async function main() {
         versionId: generated.versionId,
         versionNo: generated.versionNo,
         fileCount: generated.fileCount,
+        generationSource: generated.generationSource,
+        fallbackUsed: generated.fallbackUsed,
+        providerCode: generated.providerCode,
+        modelName: generated.modelName,
         previewLoaded: true,
         output: 'docs/images/03-generated-site-preview.webp',
       },

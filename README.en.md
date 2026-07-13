@@ -12,7 +12,7 @@ CodeForge AI is a secure and auditable AI application generation and release pla
 
 ![Generated website preview](docs/images/03-generated-site-preview.webp)
 
-This screenshot is produced by the real `generation_task -> app_version -> generated_file -> preview token` chain. The release screenshot script registers demo users through the API, creates an app, runs `RULE_GENERATION`, resolves the success `versionId`, and loads the formal preview endpoint.
+This screenshot is produced by the real `generation_task -> app_version -> generated_file -> preview token` chain. The release screenshot script registers demo users through the API, creates an app, runs generation with `CODEFORGE_FORCE_RULE_ONLY=false` and `AI_PROVIDER=deepseek`, requires `generationSource=AI_DIRECT`, `fallbackUsed=false`, and `providerCode=deepseek` from the success event, resolves the `versionId`, and loads the formal preview endpoint.
 
 ## Core Capabilities
 
