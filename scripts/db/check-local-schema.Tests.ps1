@@ -139,7 +139,7 @@ $baselineReadyInvoker = New-SchemaQueryInvoker -Responses @{
     "INDEX_NAME = 'idx_generation_task_prompt_template'" = '1'
     "INDEX_NAME = 'idx_generation_task_prompt_template_version'" = '1'
     "TABLE_NAME = 'flyway_schema_history'" = '1'
-    "version = '33'" = '0'
+    "version = '33'" = '1'
     "type IN ('BASELINE', 'SQL_BASELINE')" = '1'
     "B33__codeforge_mysql_schema.sql" = '1'
 }
@@ -187,12 +187,12 @@ catch {
 }
 
 $beforePwd = [Environment]::GetEnvironmentVariable('MYSQL_PWD', 'Process')
-$mysqlExe = 'C:\Windows\System32\cmd.exe'
+$powershellExe = (Get-Process -Id $PID).Path
 $previousMysqlPwd = [Environment]::GetEnvironmentVariable('MYSQL_PWD', 'Process')
 
 try {
     $env:MYSQL_PWD = 'temp-secret'
-    & $mysqlExe @('/c', 'exit', '0') | Out-Null
+    & $powershellExe @('-NoProfile', '-Command', 'exit 0') | Out-Null
     $null = $LASTEXITCODE
 }
 finally {
@@ -209,7 +209,7 @@ Assert-Equals $beforePwd ([Environment]::GetEnvironmentVariable('MYSQL_PWD', 'Pr
 $previousMysqlPwd = [Environment]::GetEnvironmentVariable('MYSQL_PWD', 'Process')
 try {
     $env:MYSQL_PWD = 'temp-secret'
-    & $mysqlExe @('/c', 'exit', '1') | Out-Null
+    & $powershellExe @('-NoProfile', '-Command', 'exit 1') | Out-Null
     $null = $LASTEXITCODE
 }
 finally {
