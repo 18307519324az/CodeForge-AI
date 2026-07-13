@@ -1,6 +1,7 @@
 param(
     [string]$EnvFile = '.env.local',
     [switch]$ConfirmCreate,
+    [switch]$CreateDatabase,
     [switch]$ValidateOnly,
     [string]$DbHost,
     [int]$DbPort,
@@ -106,15 +107,16 @@ function Test-DatabaseExists {
     return [int](Invoke-BootstrapMysqlScalar -Sql $sql) -gt 0
 }
 
+function Test-DatabaseExistsAsAdmin {
+    $escaped = $script:BootstrapDbName.Replace("'", "''")
+    $sql = "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '$escaped'"
+    return [int](Invoke-BootstrapMysqlScalarAsAdmin -Sql $sql) -gt 0
+}
+
 function Get-UserTableCount {
     $escaped = $script:BootstrapDbName.Replace("'", "''")
     $sql = "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = '$escaped' AND TABLE_TYPE = 'BASE TABLE'"
     return [int](Invoke-BootstrapMysqlScalar -Sql $sql)
-}
-
-function New-BootstrapDatabase {
-    $escaped = $script:BootstrapDbName.Replace('`', '``')
-    Invoke-BootstrapMysqlScalar -Sql "CREATE DATABASE IF NOT EXISTS ``$escaped`` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci" | Out-Null
 }
 
 function Get-BootstrapSchemaStatus {
@@ -155,7 +157,7 @@ function Invoke-FlywayGoal {
     }
 
     try {
-        $env:FLYWAY_URL = "jdbc:mysql://$script:BootstrapDbHost`:$script:BootstrapDbPort/$script:BootstrapDbName`?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false"
+        $env:FLYWAY_URL = "jdbc:mysql://$script:BootstrapDbHost`:$script:BootstrapDbPort/$script:BootstrapDbName`?useUnicode=true&characterEncoding=utf8&serverTimezone=$script:BootstrapDbTimezone&allowPublicKeyRetrieval=true&useSSL=false"
         $env:FLYWAY_USER = $script:BootstrapDbUsername
         $env:FLYWAY_PASSWORD = $script:BootstrapDbPassword
         $env:FLYWAY_LOCATIONS = 'filesystem:sql/migrations,filesystem:sql/mysql-local,filesystem:sql/mysql-baseline'
@@ -184,6 +186,53 @@ function Invoke-FlywayGoal {
     }
 }
 
+function Invoke-BootstrapMysqlScalarAsAdmin {
+    param([string]$Sql)
+
+    $mysqlExe = Get-MysqlExecutable
+    $args = @('-h', $script:BootstrapDbHost, '-P', "$script:BootstrapDbPort", '-u', $script:BootstrapDbAdminUsername, '-N', '-B')
+    $previousMysqlPwd = [Environment]::GetEnvironmentVariable('MYSQL_PWD', 'Process')
+    try {
+        $env:MYSQL_PWD = $script:BootstrapDbAdminPassword
+        $output = $Sql | & $mysqlExe @args 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        if ($null -eq $previousMysqlPwd) {
+            Remove-Item Env:MYSQL_PWD -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:MYSQL_PWD = $previousMysqlPwd
+        }
+    }
+    if ($exitCode -ne 0) {
+        $safeOutput = ($output | Out-String).Trim()
+        if ($safeOutput -match '(?i)access denied') {
+            throw 'MYSQL_ADMIN_ACCESS_DENIED'
+        }
+        throw 'MYSQL_ADMIN_QUERY_FAILED'
+    }
+    $firstLine = $output | Select-Object -First 1
+    if ($null -eq $firstLine) {
+        return '0'
+    }
+    return [string]$firstLine
+}
+
+function Grant-BootstrapDatabaseAccessWithAdmin {
+    $escapedDatabase = $script:BootstrapDbName.Replace('`', '``')
+    $escapedUser = $script:BootstrapDbUsername.Replace("'", "''")
+    $escapedPassword = $script:BootstrapDbPassword.Replace("'", "''")
+    Invoke-BootstrapMysqlScalarAsAdmin -Sql "CREATE USER IF NOT EXISTS '$escapedUser'@'%' IDENTIFIED BY '$escapedPassword'" | Out-Null
+    Invoke-BootstrapMysqlScalarAsAdmin -Sql "GRANT ALL PRIVILEGES ON ``$escapedDatabase``.* TO '$escapedUser'@'%'" | Out-Null
+}
+
+function New-BootstrapDatabaseWithAdmin {
+    $escapedDatabase = $script:BootstrapDbName.Replace('`', '``')
+    Invoke-BootstrapMysqlScalarAsAdmin -Sql "CREATE DATABASE IF NOT EXISTS ``$escapedDatabase`` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" | Out-Null
+    Grant-BootstrapDatabaseAccessWithAdmin
+}
+
 $envSnapshot = $null
 try {
     $envFilePath = if ([System.IO.Path]::IsPathRooted($EnvFile)) { $EnvFile } else { Join-Path $projectRoot $EnvFile }
@@ -194,6 +243,9 @@ try {
     $script:BootstrapDbName = Resolve-DbSetting -ExplicitValue $DbName -EnvironmentName 'DB_NAME'
     $script:BootstrapDbUsername = Resolve-DbSetting -ExplicitValue $DbUsername -EnvironmentName 'DB_USERNAME'
     $script:BootstrapDbPassword = Resolve-DbSetting -ExplicitValue $DbPassword -EnvironmentName 'DB_PASSWORD'
+    $script:BootstrapDbTimezone = Resolve-DbSetting -EnvironmentName 'DB_TIMEZONE' -DefaultValue 'UTC'
+    $script:BootstrapDbAdminUsername = Resolve-DbSetting -EnvironmentName 'DB_ADMIN_USERNAME'
+    $script:BootstrapDbAdminPassword = Resolve-DbSetting -EnvironmentName 'DB_ADMIN_PASSWORD'
 
     Test-LocalBootstrapHost -HostName $script:BootstrapDbHost
     Test-BootstrapDatabaseName -DatabaseName $script:BootstrapDbName
@@ -204,14 +256,27 @@ try {
         throw 'DB_PASSWORD_REQUIRED'
     }
 
+    if ($CreateDatabase) {
+        if ([string]::IsNullOrWhiteSpace($script:BootstrapDbAdminUsername)) {
+            throw 'DB_ADMIN_USERNAME_REQUIRED'
+        }
+        if ([string]::IsNullOrWhiteSpace($script:BootstrapDbAdminPassword)) {
+            throw 'DB_ADMIN_PASSWORD_REQUIRED'
+        }
+        $adminDatabaseExists = Test-DatabaseExistsAsAdmin
+        if (-not $ValidateOnly) {
+            if (-not $adminDatabaseExists) {
+                New-BootstrapDatabaseWithAdmin
+            }
+            else {
+                Grant-BootstrapDatabaseAccessWithAdmin
+            }
+        }
+    }
+
     $databaseExists = Test-DatabaseExists
     if (-not $databaseExists) {
-        if (-not $ConfirmCreate) {
-            throw 'CONFIRM_CREATE_REQUIRED'
-        }
-        if (-not $ValidateOnly) {
-            New-BootstrapDatabase
-        }
+        throw 'TARGET_DATABASE_DOES_NOT_EXIST'
     }
 
     if (Test-DatabaseExists) {

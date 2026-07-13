@@ -28,11 +28,18 @@ Assert-True ($bootstrapContent -match 'V1_EXECUTED=false') 'V1IsNotExecutedForFr
 Assert-True ($bootstrapContent -match 'FLYWAY_VALIDATE_PASS') 'FlywayValidatePassesTest'
 Assert-True ($bootstrapContent -match 'SCHEMA_STATUS=READY') 'SchemaCheckerReturnsReadyTest'
 Assert-True ($bootstrapContent -match 'ALREADY_READY') 'SecondRunIsIdempotentTest'
+Assert-True ($bootstrapContent -match 'TARGET_DATABASE_DOES_NOT_EXIST') 'MissingDatabaseRequiresExplicitCreateDatabaseTest'
+Assert-True ($bootstrapContent -match 'DB_ADMIN_USERNAME_REQUIRED') 'CreateDatabaseRequiresAdminUsernameTest'
+Assert-True ($bootstrapContent -match 'DB_ADMIN_PASSWORD_REQUIRED') 'CreateDatabaseRequiresAdminPasswordTest'
+Assert-True ($bootstrapContent -match 'DB_TIMEZONE') 'BootstrapUsesDbTimezoneTest'
+Assert-True ($bootstrapContent -match 'COLLATE utf8mb4_unicode_ci') 'BootstrapUsesB33CollationTest'
+Assert-True (-not ($bootstrapContent -match 'utf8mb4_0900_ai_ci')) 'BootstrapDoesNotUseConflictingCollationTest'
 Assert-True ($bootstrapContent -match 'NON_LOCAL_HOST') 'RejectsNonLocalHostTest'
 Assert-True ($bootstrapContent -match 'PRODUCTION_LIKE_DATABASE_NAME') 'RejectsProductionLikeDatabaseNameTest'
 Assert-True ($bootstrapContent -match 'NON_EMPTY_UNMANAGED_DATABASE') 'RejectsNonEmptyDatabaseTest'
 Assert-True ($bootstrapContent -match 'DB_PASSWORD_REQUIRED') 'RejectsMissingPasswordTest'
 Assert-True (-not ($bootstrapContent -match '--password=|-p\$DbPassword|-Dflyway\.password|FLYWAY_PASSWORD=.*\$script:BootstrapDbPassword')) 'DoesNotPutPasswordInCommandLineTest'
+Assert-True ($bootstrapContent -match '\$output = \$Sql \| & \$mysqlExe @args') 'AdminSqlIsPassedThroughStandardInputTest'
 
 $tempEnv = Join-Path $tempRoot "codeforge-envfile-$([Guid]::NewGuid()).env"
 try {

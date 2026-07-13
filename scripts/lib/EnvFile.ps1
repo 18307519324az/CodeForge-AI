@@ -1,5 +1,57 @@
 $ErrorActionPreference = 'Stop'
 
+function Convert-CodeForgeEnvValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        [string]$Value
+    )
+
+    if ($Value.StartsWith("'")) {
+        if (-not $Value.EndsWith("'") -or $Value.Length -lt 2) {
+            throw "ENV_FILE_MALFORMED_QUOTED_VALUE:$Name"
+        }
+        return $Value.Substring(1, $Value.Length - 2).Replace("''", "'")
+    }
+
+    if ($Value.StartsWith('"')) {
+        if (-not $Value.EndsWith('"') -or $Value.Length -lt 2) {
+            throw "ENV_FILE_MALFORMED_QUOTED_VALUE:$Name"
+        }
+        $inner = $Value.Substring(1, $Value.Length - 2)
+        $builder = [System.Text.StringBuilder]::new()
+        for ($i = 0; $i -lt $inner.Length; $i++) {
+            $ch = $inner[$i]
+            if ($ch -ne '\') {
+                [void]$builder.Append($ch)
+                continue
+            }
+            if ($i -eq ($inner.Length - 1)) {
+                throw "ENV_FILE_MALFORMED_QUOTED_VALUE:$Name"
+            }
+            $i++
+            $next = $inner[$i]
+            switch ($next) {
+                '"' { [void]$builder.Append('"') }
+                '\' { [void]$builder.Append('\') }
+                'n' { [void]$builder.Append("`n") }
+                'r' { [void]$builder.Append("`r") }
+                't' { [void]$builder.Append("`t") }
+                default { [void]$builder.Append($next) }
+            }
+        }
+        return $builder.ToString()
+    }
+
+    if ($Value.EndsWith("'") -or $Value.EndsWith('"')) {
+        throw "ENV_FILE_MALFORMED_QUOTED_VALUE:$Name"
+    }
+    if ($Value -match '\$\(|`') {
+        throw "ENV_FILE_UNSUPPORTED_EXPRESSION:$Name"
+    }
+    return $Value
+}
+
 function Read-CodeForgeEnvFile {
     param(
         [string]$Path
@@ -37,19 +89,7 @@ function Read-CodeForgeEnvFile {
         if ($values.ContainsKey($name)) {
             throw "ENV_FILE_DUPLICATE_VARIABLE:$name"
         }
-        if ($value -match '\$\(|`|\||&|\{|\}') {
-            throw "ENV_FILE_UNSUPPORTED_EXPRESSION:$name"
-        }
-
-        if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
-            $value = $value.Substring(1, $value.Length - 2)
-        }
-
-        if ($value -match '\$\(|`|\||&|\{|\}') {
-            throw "ENV_FILE_UNSUPPORTED_EXPRESSION:$name"
-        }
-
-        $values[$name] = $value
+        $values[$name] = Convert-CodeForgeEnvValue -Name $name -Value $value
     }
 
     return $values
