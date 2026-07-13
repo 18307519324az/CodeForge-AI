@@ -3,12 +3,15 @@ param(
     [int]$BackendPort = 8150,
     [int]$FrontendPort = 5182,
     [ValidateSet('local', 'dev-h2')]
-    [string]$Profile = 'local'
+    [string]$Profile = 'local',
+    [string]$EnvFile = '.env.local'
 )
 
 $ErrorActionPreference = 'Stop'
 $runDir = Join-Path $ProjectRoot '.run'
 $frontendRoot = Join-Path $ProjectRoot 'frontend'
+$envFileModule = Join-Path $ProjectRoot 'scripts\lib\EnvFile.ps1'
+. $envFileModule
 
 function Normalize-PathText($pathText) {
     if (-not $pathText) {
@@ -182,11 +185,10 @@ function Ensure-FrontendDependencies() {
 }
 
 function Get-BackendStartCommand($backendPort, $runtimeProfile) {
-    $deepseekKeyForward = if ($env:DEEPSEEK_API_KEY) { "set DEEPSEEK_API_KEY=$env:DEEPSEEK_API_KEY && " } else { "" }
     if ($runtimeProfile -eq 'dev-h2') {
-        return "${deepseekKeyForward}set SERVER_PORT=$backendPort && .\mvnw.cmd -Dspring-boot.run.main-class=com.codeforge.ai.CodeForgeAiApplication -Dspring-boot.run.profiles=dev -Dspring-boot.run.useTestClasspath=true -Dspring-boot.run.additional-classpath-elements=src/test/resources -Dspring-boot.run.arguments=--server.servlet.context-path=/api spring-boot:start"
+        return "set SERVER_PORT=$backendPort && .\mvnw.cmd -Dspring-boot.run.main-class=com.codeforge.ai.CodeForgeAiApplication -Dspring-boot.run.profiles=dev -Dspring-boot.run.useTestClasspath=true -Dspring-boot.run.additional-classpath-elements=src/test/resources -Dspring-boot.run.arguments=--server.servlet.context-path=/api spring-boot:start"
     }
-    return "${deepseekKeyForward}set SERVER_PORT=$backendPort && .\mvnw.cmd -Dspring-boot.run.main-class=com.codeforge.ai.CodeForgeAiApplication -Dspring-boot.run.profiles=local -Dspring-boot.run.arguments=--server.servlet.context-path=/api spring-boot:start"
+    return "set SERVER_PORT=$backendPort && .\mvnw.cmd -Dspring-boot.run.main-class=com.codeforge.ai.CodeForgeAiApplication -Dspring-boot.run.profiles=local -Dspring-boot.run.arguments=--server.servlet.context-path=/api spring-boot:start"
 }
 
 function Start-Backend() {
@@ -263,8 +265,7 @@ function Start-Frontend() {
     $apiBaseUrl = "http://127.0.0.1:$BackendPort/api/v1"
     $appBaseUrl = "http://127.0.0.1:$BackendPort/api"
     $apiProxyTarget = "http://127.0.0.1:$BackendPort"
-    $deepseekKeyForward = if ($env:DEEPSEEK_API_KEY) { "set ""DEEPSEEK_API_KEY=$env:DEEPSEEK_API_KEY"" && " } else { "" }
-    $command = "/c ${deepseekKeyForward}set ""VITE_API_BASE_URL=$apiBaseUrl"" && set ""VITE_APP_BASE_URL=$appBaseUrl"" && set ""VITE_API_PROXY_TARGET=$apiProxyTarget"" && npm.cmd run dev -- --host 127.0.0.1 --port $FrontendPort"
+    $command = "/c set ""VITE_API_BASE_URL=$apiBaseUrl"" && set ""VITE_APP_BASE_URL=$appBaseUrl"" && set ""VITE_API_PROXY_TARGET=$apiProxyTarget"" && npm.cmd run dev -- --host 127.0.0.1 --port $FrontendPort"
     $proc = Start-Process -FilePath 'cmd.exe' `
         -ArgumentList $command `
         -WorkingDirectory $frontendRoot `
@@ -295,35 +296,45 @@ function Start-Frontend() {
     Write-Host "Frontend wrapper is still running, but port $FrontendPort is not listening yet. Check $stdout" -ForegroundColor Yellow
 }
 
-Ensure-RunDir
-
-Write-Host "=== Dev Process Start ===" -ForegroundColor Cyan
-Write-Host "ProjectRoot: $ProjectRoot"
-Write-Host "Runtime Profile: $Profile"
-Write-Host ""
-$startFailed = $false
-
+$envSnapshot = $null
 try {
-    Start-Backend
-} catch {
-    Write-Host "Backend start failed: $($_.Exception.Message)" -ForegroundColor Red
-    $startFailed = $true
+    $envPath = if ([System.IO.Path]::IsPathRooted($EnvFile)) { $EnvFile } else { Join-Path $ProjectRoot $EnvFile }
+    $envSnapshot = Import-CodeForgeEnvFile -Path $envPath
+    Ensure-RunDir
+
+    Write-Host "=== Dev Process Start ===" -ForegroundColor Cyan
+    Write-Host "ProjectRoot: $ProjectRoot"
+    Write-Host "Runtime Profile: $Profile"
+    Write-Host ""
+    $startFailed = $false
+
+    try {
+        Start-Backend
+    } catch {
+        Write-Host "Backend start failed: $($_.Exception.Message)" -ForegroundColor Red
+        $startFailed = $true
+    }
+
+    Start-Sleep -Seconds 2
+
+    try {
+        Start-Frontend
+    } catch {
+        Write-Host "Frontend start failed: $($_.Exception.Message)" -ForegroundColor Red
+        $startFailed = $true
+    }
+
+    Start-Sleep -Seconds 2
+
+    Write-Host ""
+    & (Join-Path $PSScriptRoot 'dev-status.ps1') -ProjectRoot $ProjectRoot -BackendPort $BackendPort -FrontendPort $FrontendPort
+
+    if ($startFailed) {
+        exit 1
+    }
 }
-
-Start-Sleep -Seconds 2
-
-try {
-    Start-Frontend
-} catch {
-    Write-Host "Frontend start failed: $($_.Exception.Message)" -ForegroundColor Red
-    $startFailed = $true
-}
-
-Start-Sleep -Seconds 2
-
-Write-Host ""
-& (Join-Path $PSScriptRoot 'dev-status.ps1') -ProjectRoot $ProjectRoot -BackendPort $BackendPort -FrontendPort $FrontendPort
-
-if ($startFailed) {
-    exit 1
+finally {
+    if ($null -ne $envSnapshot) {
+        Restore-CodeForgeEnvironment -Snapshot $envSnapshot
+    }
 }

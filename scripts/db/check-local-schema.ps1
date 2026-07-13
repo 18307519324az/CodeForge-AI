@@ -141,7 +141,7 @@ function Test-BaselineFlywayHistoryPresent {
     $baselineSql = @"
 SELECT COUNT(*) FROM flyway_schema_history
 WHERE version = '33'
-  AND type = 'BASELINE'
+  AND type IN ('BASELINE', 'SQL_BASELINE')
   AND script LIKE '%B33__codeforge_mysql_schema.sql%'
   AND success = 1
 "@

@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.codeforge</groupId>
     <artifactId>codeforge-ai</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <name>codeforge-ai</name>
     <description>安全的全栈 AI 应用生成与发布平台</description>
     <url>https://github.com/18307519324az/CodeForge-AI</url>
@@ -238,6 +238,19 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-maven-plugin</artifactId>
+                <version>11.7.2</version>
+                <configuration>
+                    <url>${env.FLYWAY_URL}</url>
+                    <user>${env.FLYWAY_USER}</user>
+                    <password>${env.FLYWAY_PASSWORD}</password>
+                    <locations>${env.FLYWAY_LOCATIONS}</locations>
+                    <baselineOnMigrate>true</baselineOnMigrate>
+                    <cleanDisabled>true</cleanDisabled>
                 </configuration>
             </plugin>
         </plugins>

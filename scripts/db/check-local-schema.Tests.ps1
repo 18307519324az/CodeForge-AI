@@ -137,7 +137,7 @@ $baselineReadyInvoker = New-SchemaQueryInvoker -Responses @{
     "INDEX_NAME = 'idx_generation_task_prompt_template_version'" = '1'
     "TABLE_NAME = 'flyway_schema_history'" = '1'
     "version = '33'" = '0'
-    "type = 'BASELINE'" = '1'
+    "type IN ('BASELINE', 'SQL_BASELINE')" = '1'
     "B33__codeforge_mysql_schema.sql" = '1'
 }
 

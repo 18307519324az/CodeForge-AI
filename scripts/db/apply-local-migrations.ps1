@@ -3,10 +3,18 @@ param(
     [int]$DbPort = $(if ($env:DB_PORT) { [int]$env:DB_PORT } else { 3306 }),
     [string]$DbName = $(if ($env:DB_NAME) { $env:DB_NAME } else { 'codeforge_ai' }),
     [string]$DbUser = $(if ($env:DB_USERNAME) { $env:DB_USERNAME } else { 'codeforge_ai_user' }),
-    [string]$DbPassword = $env:DB_PASSWORD
+    [string]$DbPassword = $env:DB_PASSWORD,
+    [switch]$ConfirmLegacyRecovery
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $ConfirmLegacyRecovery) {
+    Write-Host 'EXPERIMENTAL_LEGACY_RECOVERY'
+    Write-Host 'This script is only for manually reviewed legacy local databases. Fresh databases must use scripts/db/bootstrap-fresh-database.ps1.'
+    Write-Host 'Re-run with -ConfirmLegacyRecovery only after investigating HISTORY_MISMATCH and confirming no Flyway repair/checksum rewrite is required.'
+    exit 10
+}
 
 $checkScript = Join-Path $PSScriptRoot 'check-local-schema.ps1'
 . $checkScript

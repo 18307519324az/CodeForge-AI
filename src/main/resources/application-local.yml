@@ -30,4 +30,4 @@ codeforge:
     base-url: ${AI_BASE_URL:https://api.deepseek.com}
     model: ${AI_MODEL:deepseek-v4-pro}
   generation:
-    force-rule-only: false
+    force-rule-only: ${CODEFORGE_FORCE_RULE_ONLY:false}
