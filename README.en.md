@@ -12,7 +12,7 @@ CodeForge AI is a secure and auditable AI application generation and release pla
 
 ![Generated website preview](docs/images/03-generated-site-preview.webp)
 
-This screenshot is produced by the real `generation_task -> app_version -> generated_file -> preview token` chain. The release screenshot script registers demo users through the API, creates an app, runs generation with `CODEFORGE_FORCE_RULE_ONLY=false` and `AI_PROVIDER=deepseek`, requires `generationSource=AI_DIRECT`, `fallbackUsed=false`, and `providerCode=deepseek` from the success event, resolves the `versionId`, and loads the formal preview endpoint.
+This screenshot is produced by the real `generation_task -> app_version -> generated_file -> preview token` chain. The screenshot task uses `taskType=RULE_GENERATION` as the business task type; actual model execution is verified from `model_call_log` as `generationSource=AI_DIRECT`, the provider is supplied by `CODEFORGE_SCREENSHOT_EXPECTED_PROVIDER` and checked against `providerCode`, and `fallbackUsed=false`. The script resolves the `versionId` from the success event and loads the formal static preview endpoint.
 
 ## Core Capabilities
 
@@ -82,12 +82,20 @@ Private reads enforce owner, workspace, app, version, and package binding. Previ
 git clone https://github.com/18307519324az/CodeForge-AI.git
 cd CodeForge-AI
 Copy-Item .env.example .env.local
-docker compose up -d mysql redis
+docker compose --env-file .env.local up -d mysql redis
 powershell -File .\scripts\db\bootstrap-fresh-database.ps1 -EnvFile .env.local -ConfirmCreate
 powershell -File .\scripts\dev-start.ps1 -Profile local -EnvFile .env.local -BackendPort 8150 -FrontendPort 5182
 ```
 
 Open `http://127.0.0.1:5182`. The first registered user in a fresh database receives `PLATFORM_ADMIN`.
+
+Linux/macOS startup uses:
+
+```bash
+ENV_FILE=.env.local PROFILE=local BACKEND_PORT=8150 FRONTEND_PORT=5182 ./scripts/dev-start.sh
+./scripts/dev-status.sh
+./scripts/dev-stop.sh
+```
 
 ## Fresh Database Bootstrap
 
@@ -98,6 +106,8 @@ B33_BASELINE_APPLIED
 FLYWAY_VALIDATE_PASS
 SCHEMA_STATUS=READY
 ```
+
+By default the script only initializes an existing empty database. If the target database does not exist, it returns `TARGET_DATABASE_DOES_NOT_EXIST`. Creating a missing database requires `-CreateDatabase` plus both `DB_ADMIN_USERNAME` and `DB_ADMIN_PASSWORD`; Flyway still runs with `DB_USERNAME` and `DB_PASSWORD`.
 
 `scripts/db/apply-local-migrations.ps1` is an `EXPERIMENTAL_LEGACY_RECOVERY` tool for manually reviewed historical local databases. It is not the fresh bootstrap path.
 
@@ -125,6 +135,7 @@ Pop-Location
 node --test scripts/release/**/*.test.mjs
 powershell -File scripts/db/bootstrap-fresh-database.Tests.ps1
 powershell -File scripts/db/check-local-schema.Tests.ps1
+powershell -File scripts/lib/EnvFile.Tests.ps1
 bash scripts/check-compliance.sh
 ```
 

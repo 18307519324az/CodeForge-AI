@@ -10,7 +10,7 @@ Copy the sample file:
 Copy-Item .env.example .env.local
 ```
 
-Both `scripts/db/bootstrap-fresh-database.ps1` and `scripts/dev-start.ps1` load `.env.local` through `scripts/lib/EnvFile.ps1`. The loader accepts `KEY=VALUE`, comments, blank lines, and simple quoted values. It rejects PowerShell expressions, command substitution, pipes, script blocks, duplicate variables, and unsupported variable names.
+`scripts/db/bootstrap-fresh-database.ps1`, `scripts/dev-start.ps1`, and the Bash dev scripts load `.env.local` as literal key/value configuration. The PowerShell loader accepts `KEY=VALUE`, comments, blank lines, and quoted strong passwords containing `&`, `|`, `{`, `}`, `$`, and spaces. It rejects malformed quoted values, command substitution, backtick expressions, duplicate variables, and unsupported variable names.
 
 ## Required Local Values
 
@@ -67,6 +67,8 @@ powershell -File .\scripts\db\bootstrap-fresh-database.ps1 -EnvFile .env.local -
 ```
 
 Expected output includes `B33_BASELINE_APPLIED`, `FLYWAY_VALIDATE_PASS`, and `SCHEMA_STATUS=READY`.
+
+If the target database does not exist, the default path returns `TARGET_DATABASE_DOES_NOT_EXIST`. Explicit creation requires `-CreateDatabase` with `DB_ADMIN_USERNAME` and `DB_ADMIN_PASSWORD`; migration still uses `DB_USERNAME` and `DB_PASSWORD`.
 
 ## Legacy Recovery
 

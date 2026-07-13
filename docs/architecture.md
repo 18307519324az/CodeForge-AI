@@ -78,7 +78,7 @@ Fresh MySQL uses `B33__codeforge_mysql_schema.sql` as the baseline migration. In
 
 ## 17. Local Deployment Boundary
 
-Docker Compose provides MySQL and Redis. Backend and frontend run as local processes through `scripts/dev-start.ps1`.
+Docker Compose provides MySQL and Redis. Windows runs backend and frontend through `scripts/dev-start.ps1`; Linux/macOS can use `scripts/dev-start.sh`, `scripts/dev-status.sh`, and `scripts/dev-stop.sh`.
 
 ## 18. Known Architecture Limits
 

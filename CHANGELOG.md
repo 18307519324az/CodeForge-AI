@@ -15,6 +15,8 @@
 - Expanded Chinese and English README documentation.
 - Added complete architecture and product tour documentation.
 - Added Fresh Bootstrap CI gate.
+- Added Runtime Smoke CI gate.
+- Added cross-platform Bash dev startup scripts.
 - Added generated-preview evidence and screenshot validation.
 - Added repository Social Preview.
 

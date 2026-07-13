@@ -27,6 +27,16 @@ AI_PROVIDER=rule
 
 For AI_DIRECT, verify the provider key is present in `.env.local` and never appears in command-line arguments or logs.
 
+## Docker Compose Does Not See .env.local
+
+Use the explicit env-file form:
+
+```powershell
+docker compose --env-file .env.local up -d mysql redis
+```
+
+Running without `--env-file` intentionally fails when required MySQL passwords are not already present in the process environment.
+
 ## Preview Fails
 
 Confirm the requested `versionId` belongs to the app and the preview token was issued through:

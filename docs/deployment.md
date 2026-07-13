@@ -7,7 +7,7 @@
 3. Start infrastructure:
 
 ```powershell
-docker compose up -d mysql redis
+docker compose --env-file .env.local up -d mysql redis
 ```
 
 4. Initialize a fresh MySQL database:
@@ -22,9 +22,15 @@ powershell -File .\scripts\db\bootstrap-fresh-database.ps1 -EnvFile .env.local -
 powershell -File .\scripts\dev-start.ps1 -Profile local -EnvFile .env.local -BackendPort 8150 -FrontendPort 5182
 ```
 
+Linux/macOS:
+
+```bash
+ENV_FILE=.env.local PROFILE=local BACKEND_PORT=8150 FRONTEND_PORT=5182 ./scripts/dev-start.sh
+```
+
 ## Fresh DB
 
-Fresh DB initialization is only `scripts/db/bootstrap-fresh-database.ps1`. It loads `.env.local` through the safe EnvFile parser, runs Flyway `info`, `migrate`, `validate`, and then `check-local-schema.ps1`.
+Fresh DB initialization is only `scripts/db/bootstrap-fresh-database.ps1`. It loads `.env.local` through the safe EnvFile parser, runs Flyway `info`, `migrate`, `validate`, and then `check-local-schema.ps1`. The default path initializes an existing empty database; a missing target database returns `TARGET_DATABASE_DOES_NOT_EXIST` unless `-CreateDatabase` is used with `DB_ADMIN_USERNAME` and `DB_ADMIN_PASSWORD`.
 
 ## Legacy Recovery
 
