@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, statSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -38,6 +39,7 @@ const sensitiveTokenPattern = new RegExp(
 )
 const windowsDrivePattern = new RegExp(`${'C'}:[\\\\/]`)
 const windowsUserPathPattern = new RegExp(`${'C'}:[\\\\/]Users[\\\\/]`)
+const generatedEvidencePath = '.local-data/release-evidence/generated-preview.json'
 
 function read(relativePath) {
   return readFileSync(path.join(projectRoot, relativePath), 'utf8')
@@ -158,4 +160,132 @@ test('Chinese and English README keep required section parity', () => {
   ]) {
     assert.match(zh, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
   }
+})
+
+test('ChineseAndEnglishPreviewProvenanceMatchesTest', () => {
+  const zh = read('README.md')
+  const en = read('README.en.md')
+  for (const text of [zh, en]) {
+    assert.match(text, /taskType/)
+    assert.match(text, /RULE_GENERATION/)
+    assert.match(text, /generationSource/)
+    assert.match(text, /AI_DIRECT/)
+    assert.match(text, /providerCode/)
+    assert.match(text, /fallbackUsed=false/)
+  }
+})
+
+test('ScreenshotProviderIsConfigurableTest', () => {
+  const script = read('scripts/release/capture-readme-screenshots.mjs')
+  assert.match(script, /CODEFORGE_SCREENSHOT_EXPECTED_PROVIDER/)
+  assert.match(script, /expectedProvider/)
+})
+
+test('ScreenshotScriptDoesNotHardcodeDeepSeekTest', () => {
+  const script = read('scripts/release/capture-readme-screenshots.mjs')
+  assert.equal(/assertDeepSeekAiDirect|providerCode\s*!==\s*'deepseek'/.test(script), false)
+})
+
+test('ScreenshotRequiresAiDirectTest', () => {
+  assert.match(read('scripts/release/capture-readme-screenshots.mjs'), /startsWith\('AI_DIRECT'\)/)
+})
+
+test('ScreenshotRejectsFallbackTest', () => {
+  assert.match(read('scripts/release/capture-readme-screenshots.mjs'), /fallbackUsed/)
+})
+
+test('PreviewRequiresHttp200Test', () => {
+  assert.match(read('scripts/release/capture-readme-screenshots.mjs'), /status !== 200/)
+})
+
+test('PreviewRequiresHtmlContentTypeTest', () => {
+  assert.match(read('scripts/release/capture-readme-screenshots.mjs'), /text\/html/)
+})
+
+test('PreviewRejectsLoginPageTest', () => {
+  assert.match(read('scripts/release/capture-readme-screenshots.mjs'), /登录 CodeForge/)
+})
+
+test('PreviewRejectsAdminPageTest', () => {
+  const script = read('scripts/release/capture-readme-screenshots.mjs')
+  assert.match(script, /管理概览/)
+  assert.match(script, /模型供应商/)
+})
+
+test('PreviewRejectsJsonTest', () => {
+  assert.match(read('scripts/release/capture-readme-screenshots.mjs'), /startsWith\('\{'\)/)
+})
+
+test('PreviewRejectsErrorPageTest', () => {
+  const script = read('scripts/release/capture-readme-screenshots.mjs')
+  assert.match(script, /Whitelabel Error Page/)
+  assert.match(script, /Internal Server Error/)
+  assert.match(script, /404 Not Found/)
+})
+
+test('PreviewRequiresSemanticHtmlTest', () => {
+  assert.match(read('scripts/release/capture-readme-screenshots.mjs'), /main, header, nav, section, h1/)
+})
+
+test('PreviewImageVarianceTest', () => {
+  const result = execFileSync(
+    'python',
+    [
+      '-c',
+      [
+        'from PIL import Image, ImageStat',
+        'import sys',
+        'img = Image.open(sys.argv[1]).convert("RGB")',
+        'stat = ImageStat.Stat(img)',
+        'print(max(stat.var))',
+      ].join('\n'),
+      path.join(projectRoot, 'docs/images/03-generated-site-preview.webp'),
+    ],
+    { encoding: 'utf8' },
+  )
+  assert.ok(Number(result.trim()) >= 20)
+})
+
+test('PreviewImageContainsNoExifTest', () => {
+  const result = execFileSync(
+    'python',
+    [
+      '-c',
+      [
+        'from PIL import Image',
+        'import sys',
+        'img = Image.open(sys.argv[1])',
+        'print(len(img.getexif()) if img.getexif() else 0)',
+      ].join('\n'),
+      path.join(projectRoot, 'docs/images/03-generated-site-preview.webp'),
+    ],
+    { encoding: 'utf8' },
+  )
+  assert.equal(result.trim(), '0')
+})
+
+test('EvidenceContainsNoIdentifiersOrTokenTest', () => {
+  assert.equal(existsSync(path.join(projectRoot, generatedEvidencePath)), true)
+  const evidence = read(generatedEvidencePath)
+  const parsed = JSON.parse(evidence)
+  assert.deepEqual(Object.keys(parsed).sort(), [
+    'consoleErrorCount',
+    'domAssertions',
+    'fallbackUsed',
+    'fileCount',
+    'generationSource',
+    'modelName',
+    'ok',
+    'pageErrorCount',
+    'previewContentType',
+    'previewHttpStatus',
+    'providerCode',
+    'requestFailureCount',
+    'runtimeHead',
+    'screenshotSha256',
+    'taskType',
+    'timestamp',
+  ].sort())
+  assert.equal(/appId|taskId|versionId|previewToken|previewUrl|Cookie|API Key|storagePath|prompt/i.test(evidence), false)
+  assert.match(parsed.screenshotSha256, /^[a-f0-9]{64}$/)
 })

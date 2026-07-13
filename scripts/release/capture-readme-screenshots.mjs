@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '../..')
@@ -22,6 +23,7 @@ const requiredEnv = [
   'CODEFORGE_SCREENSHOT_USER_PASSWORD',
   'CODEFORGE_SCREENSHOT_USER_B_USERNAME',
   'CODEFORGE_SCREENSHOT_USER_B_PASSWORD',
+  'CODEFORGE_SCREENSHOT_EXPECTED_PROVIDER',
 ]
 
 function readRequiredEnv(name) {
@@ -39,6 +41,7 @@ for (const name of requiredEnv) {
 const baseUrl = readRequiredEnv('CODEFORGE_SCREENSHOT_BASE_URL').replace(/\/$/, '')
 const apiBaseUrl = `${baseUrl}/api/v1`
 const demoDbName = (process.env.DB_NAME || '').trim()
+const expectedProvider = readRequiredEnv('CODEFORGE_SCREENSHOT_EXPECTED_PROVIDER')
 
 async function apiRaw(token, pathText, options = {}) {
   const response = await fetch(`${apiBaseUrl}${pathText}`, {
@@ -111,7 +114,7 @@ async function findModelCallForTask(adminToken, taskId) {
   return records.find((record) => String(record.taskId) === String(taskId)) || null
 }
 
-async function assertDeepSeekAiDirect(adminToken, taskId) {
+async function assertExpectedAiDirect(adminToken, taskId) {
   const modelCall = await findModelCallForTask(adminToken, taskId)
   if (!modelCall) {
     throw new Error('generated preview model call evidence missing')
@@ -122,8 +125,11 @@ async function assertDeepSeekAiDirect(adminToken, taskId) {
   if (modelCall.fallbackUsed) {
     throw new Error('generated preview used fallback output')
   }
-  if (modelCall.providerCode !== 'deepseek') {
-    throw new Error(`generated preview did not use deepseek: ${modelCall.providerCode || 'UNKNOWN'}`)
+  if (modelCall.providerCode !== expectedProvider) {
+    throw new Error(`generated preview did not use expected provider: ${modelCall.providerCode || 'UNKNOWN'}`)
+  }
+  if (!String(modelCall.modelName || '').trim()) {
+    throw new Error('generated preview model name missing')
   }
   return modelCall
 }
@@ -143,8 +149,9 @@ async function buildGeneratedEvidence(userToken, adminToken, appId, taskId, vers
   if (!previewTokenMatch) {
     throw new Error('preview token response missing previewToken')
   }
-  const modelCall = await assertDeepSeekAiDirect(adminToken, taskId)
+  const modelCall = await assertExpectedAiDirect(adminToken, taskId)
   return {
+    taskType: 'RULE_GENERATION',
     appId: String(appId),
     taskId: String(taskId),
     versionId: String(versionId),
@@ -253,16 +260,107 @@ async function capture(page, route, fileName) {
 }
 
 async function captureAbsolute(page, url, fileName) {
-  await page.goto(url, { waitUntil: 'networkidle' })
+  const observations = {
+    consoleErrorCount: 0,
+    pageErrorCount: 0,
+    requestFailureCount: 0,
+    unexpected5xxCount: 0,
+  }
+  const onConsole = (message) => {
+    if (message.type() === 'error') {
+      observations.consoleErrorCount += 1
+    }
+  }
+  const onPageError = () => {
+    observations.pageErrorCount += 1
+  }
+  const onRequestFailed = () => {
+    observations.requestFailureCount += 1
+  }
+  const onResponse = (response) => {
+    if (response.status() >= 500) {
+      observations.unexpected5xxCount += 1
+    }
+  }
+  page.on('console', onConsole)
+  page.on('pageerror', onPageError)
+  page.on('requestfailed', onRequestFailed)
+  page.on('response', onResponse)
+  const response = await page.goto(url, { waitUntil: 'networkidle' })
   await stabilize(page)
+  if (!response) {
+    throw new Error('generated preview navigation response missing')
+  }
+  const status = response.status()
+  if (status !== 200) {
+    throw new Error(`generated preview HTTP status ${status}`)
+  }
+  const contentType = response.headers()['content-type'] || ''
+  if (!contentType.toLowerCase().includes('text/html')) {
+    throw new Error(`generated preview content type ${contentType || 'UNKNOWN'}`)
+  }
+  const parsedUrl = new URL(page.url())
+  if (!parsedUrl.pathname.includes('/api/v1/static-preview')) {
+    throw new Error(`generated preview URL is not static-preview: ${parsedUrl.pathname}`)
+  }
+  const hasSemanticHtml = await page.locator('main, header, nav, section, h1').first().count()
+  if (hasSemanticHtml < 1) {
+    throw new Error('generated preview semantic HTML missing')
+  }
   const visibleText = await page.locator('body').innerText().catch(() => '')
-  if (visibleText.trim().length < 40) {
+  if (visibleText.trim().length < 80) {
     throw new Error('generated preview page has insufficient visible text')
+  }
+  const trimmed = visibleText.trim()
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    throw new Error('generated preview page is JSON text')
+  }
+  const forbidden = [
+    '登录 CodeForge',
+    '管理概览',
+    '模型供应商',
+    '应用广场',
+    'Whitelabel Error Page',
+    'Internal Server Error',
+    '404 Not Found',
+  ]
+  for (const marker of forbidden) {
+    if (visibleText.includes(marker)) {
+      throw new Error(`generated preview contains forbidden marker: ${marker}`)
+    }
+  }
+  const html = await page.content()
+  if (/storagePath|[A-Za-z]:[\\/]|\/var\/|\/tmp\/|\/home\//.test(html)) {
+    throw new Error('generated preview contains server storage path marker')
+  }
+  const previewToken = new URL(url).searchParams.get('previewToken')
+  if (previewToken && html.includes(previewToken)) {
+    throw new Error('generated preview contains preview token')
+  }
+  if (observations.consoleErrorCount !== 0 || observations.pageErrorCount !== 0 || observations.requestFailureCount !== 0 || observations.unexpected5xxCount !== 0) {
+    throw new Error('generated preview browser observations contain errors')
   }
   const outputPath = path.join(imageDir, fileName)
   const tempPath = outputPath.replace(/\.webp$/i, '.tmp.png')
   await page.screenshot({ path: tempPath, type: 'png', fullPage: false })
   convertPngToWebp(tempPath, outputPath, 86)
+  const imageEvidence = validateWebpScreenshot(outputPath)
+  return {
+    previewHttpStatus: status,
+    previewContentType: contentType,
+    domAssertions: {
+      staticPreviewPath: true,
+      semanticHtml: true,
+      visibleTextLengthAtLeast80: true,
+      rejectedLoginAdminJsonAndErrorPages: true,
+      serverPathAbsent: true,
+      tokenAbsent: true,
+    },
+    consoleErrorCount: observations.consoleErrorCount,
+    pageErrorCount: observations.pageErrorCount,
+    requestFailureCount: observations.requestFailureCount,
+    screenshotSha256: imageEvidence.sha256,
+  }
 }
 
 async function setPreviewCookie(context, previewToken) {
@@ -289,6 +387,31 @@ function convertPngToWebp(sourcePath, targetPath, quality) {
     'os.remove(src)',
   ].join('\n')
   execFileSync('python', ['-c', script, sourcePath, targetPath, String(quality)], { stdio: 'ignore' })
+}
+
+function validateWebpScreenshot(filePath) {
+  const script = [
+    'from PIL import Image, ImageStat',
+    'import hashlib, json, os, sys',
+    'path = sys.argv[1]',
+    'with Image.open(path) as img:',
+    '    if img.format != "WEBP": raise SystemExit("IMAGE_NOT_WEBP")',
+    '    width, height = img.size',
+    '    if width < 1200 or height < 700: raise SystemExit("IMAGE_DIMENSIONS_TOO_SMALL")',
+    '    if os.path.getsize(path) >= 1000000: raise SystemExit("IMAGE_TOO_LARGE")',
+    '    rgb = img.convert("RGB")',
+    '    colors = rgb.resize((320, 180)).getcolors(maxcolors=320*180)',
+    '    if colors is None or len(colors) < 64: raise SystemExit("IMAGE_COLOR_COUNT_TOO_LOW")',
+    '    stat = ImageStat.Stat(rgb)',
+    '    if max(stat.var) < 20: raise SystemExit("IMAGE_VARIANCE_TOO_LOW")',
+    '    mean = sum(stat.mean) / len(stat.mean)',
+    '    if mean > 248 or mean < 7: raise SystemExit("IMAGE_MEAN_OUT_OF_RANGE")',
+    '    if img.getexif() and len(img.getexif()) > 0: raise SystemExit("IMAGE_HAS_EXIF")',
+    'with open(path, "rb") as fh:',
+    '    sha256 = hashlib.sha256(fh.read()).hexdigest()',
+    'print(json.dumps({"sha256": sha256, "width": width, "height": height}))',
+  ].join('\n')
+  return JSON.parse(execFileSync('python', ['-c', script, filePath], { encoding: 'utf8' }))
 }
 
 async function ensureNonEmpty(fileName) {
@@ -379,7 +502,7 @@ async function main() {
     ? generated.previewUrl
     : `${baseUrl}${generated.previewUrl.startsWith('/') ? '' : '/'}${generated.previewUrl}`
   await setPreviewCookie(userPage.context(), generated.previewToken)
-  await captureAbsolute(userPage, previewUrl, '03-generated-site-preview.webp')
+  const generatedPreviewEvidence = await captureAbsolute(userPage, previewUrl, '03-generated-site-preview.webp')
   await capture(userPage, `/apps/${encodeURIComponent(appId)}/files?versionId=${encodeURIComponent(versionId)}`, '04-artifact-workbench.webp')
   await capture(userPage, '/explore', '05-marketplace.webp')
   await userPage.close()
@@ -417,23 +540,27 @@ async function main() {
     JSON.stringify(
       {
         ok: true,
-        appId: generated.appId,
-        taskId: generated.taskId,
-        versionId: generated.versionId,
-        versionNo: generated.versionNo,
+        timestamp: new Date().toISOString(),
+        runtimeHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: projectRoot, encoding: 'utf8' }).trim(),
+        taskType: generated.taskType,
         fileCount: generated.fileCount,
         generationSource: generated.generationSource,
         fallbackUsed: generated.fallbackUsed,
         providerCode: generated.providerCode,
         modelName: generated.modelName,
-        previewLoaded: true,
-        output: 'docs/images/03-generated-site-preview.webp',
+        previewHttpStatus: generatedPreviewEvidence.previewHttpStatus,
+        previewContentType: generatedPreviewEvidence.previewContentType,
+        domAssertions: generatedPreviewEvidence.domAssertions,
+        consoleErrorCount: generatedPreviewEvidence.consoleErrorCount,
+        pageErrorCount: generatedPreviewEvidence.pageErrorCount,
+        requestFailureCount: generatedPreviewEvidence.requestFailureCount,
+        screenshotSha256: generatedPreviewEvidence.screenshotSha256,
       },
       null,
       2,
     ),
   )
-  console.log(JSON.stringify({ ok: true, appId, taskId: generated.taskId, versionId, fileCount: generated.fileCount, outputDir: 'docs/images' }))
+  console.log(JSON.stringify({ ok: true, fileCount: generated.fileCount, providerCode: generated.providerCode, outputDir: 'docs/images' }))
 }
 
 main().catch((error) => {

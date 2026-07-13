@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "timestamp": "2026-07-13T05:29:11.972Z",
+  "runtimeHead": "defda33c5bef8c64b7917d5a94898149196e8267",
+  "taskType": "RULE_GENERATION",
+  "fileCount": 1,
+  "generationSource": "AI_DIRECT_INITIAL",
+  "fallbackUsed": false,
+  "providerCode": "deepseek",
+  "modelName": "deepseek-chat",
+  "previewHttpStatus": 200,
+  "previewContentType": "text/html;charset=UTF-8",
+  "domAssertions": {
+    "staticPreviewPath": true,
+    "semanticHtml": true,
+    "visibleTextLengthAtLeast80": true,
+    "rejectedLoginAdminJsonAndErrorPages": true,
+    "serverPathAbsent": true,
+    "tokenAbsent": true
+  },
+  "consoleErrorCount": 0,
+  "pageErrorCount": 0,
+  "requestFailureCount": 0,
+  "screenshotSha256": "19f708c2f2fc171e9e94c70be915cffd82afc065a23d4671adad35b6be11f953"
+}
