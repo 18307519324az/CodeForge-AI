@@ -20,6 +20,8 @@ function Assert-Equals {
 
 . $envModule
 
+$tempRoot = [System.IO.Path]::GetTempPath()
+
 $bootstrapContent = Get-Content -LiteralPath $bootstrapScript -Raw
 Assert-True ($bootstrapContent -match 'B33_BASELINE_APPLIED') 'EmptyLocalDatabaseUsesB33Test'
 Assert-True ($bootstrapContent -match 'V1_EXECUTED=false') 'V1IsNotExecutedForFreshDatabaseTest'
@@ -32,7 +34,7 @@ Assert-True ($bootstrapContent -match 'NON_EMPTY_UNMANAGED_DATABASE') 'RejectsNo
 Assert-True ($bootstrapContent -match 'DB_PASSWORD_REQUIRED') 'RejectsMissingPasswordTest'
 Assert-True (-not ($bootstrapContent -match '--password=|-p\$DbPassword|-Dflyway\.password|FLYWAY_PASSWORD=.*\$script:BootstrapDbPassword')) 'DoesNotPutPasswordInCommandLineTest'
 
-$tempEnv = Join-Path $env:TEMP "codeforge-envfile-$([Guid]::NewGuid()).env"
+$tempEnv = Join-Path $tempRoot "codeforge-envfile-$([Guid]::NewGuid()).env"
 try {
     @(
         'DB_HOST=127.0.0.1'
@@ -52,7 +54,7 @@ finally {
     }
 }
 
-$tempEnv = Join-Path $env:TEMP "codeforge-envfile-$([Guid]::NewGuid()).env"
+$tempEnv = Join-Path $tempRoot "codeforge-envfile-$([Guid]::NewGuid()).env"
 try {
     'DB_PASSWORD=$(Get-Content secret.txt)' | Set-Content -LiteralPath $tempEnv -Encoding ASCII
     try {
@@ -69,7 +71,7 @@ finally {
     }
 }
 
-$tempEnv = Join-Path $env:TEMP "codeforge-envfile-$([Guid]::NewGuid()).env"
+$tempEnv = Join-Path $tempRoot "codeforge-envfile-$([Guid]::NewGuid()).env"
 try {
     @('DB_PASSWORD=a', 'DB_PASSWORD=b') | Set-Content -LiteralPath $tempEnv -Encoding ASCII
     try {
@@ -86,7 +88,7 @@ finally {
     }
 }
 
-$tempEnv = Join-Path $env:TEMP "codeforge-envfile-$([Guid]::NewGuid()).env"
+$tempEnv = Join-Path $tempRoot "codeforge-envfile-$([Guid]::NewGuid()).env"
 $previous = [Environment]::GetEnvironmentVariable('DB_HOST', 'Process')
 try {
     $env:DB_HOST = 'process-value'

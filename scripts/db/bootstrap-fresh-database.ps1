@@ -134,7 +134,11 @@ function Get-BootstrapSchemaStatus {
 function Invoke-FlywayGoal {
     param([string]$Goal)
 
-    $mvn = Join-Path $projectRoot 'mvnw.cmd'
+    $isWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
+    $mvn = Join-Path $projectRoot $(if ($isWindows) { 'mvnw.cmd' } else { 'mvnw' })
+    if (-not (Test-Path -LiteralPath $mvn -PathType Leaf)) {
+        $mvn = Join-Path $projectRoot 'mvnw.cmd'
+    }
     if (-not (Test-Path -LiteralPath $mvn -PathType Leaf)) {
         $mvn = Join-Path $projectRoot 'mvnw'
     }
