@@ -13,6 +13,8 @@
 - `CODEFORGE_SCREENSHOT_ADMIN_PASSWORD`
 - `CODEFORGE_SCREENSHOT_USER_USERNAME`
 - `CODEFORGE_SCREENSHOT_USER_PASSWORD`
+- `CODEFORGE_SCREENSHOT_USER_B_USERNAME`
+- `CODEFORGE_SCREENSHOT_USER_B_PASSWORD`
 
 执行：
 
@@ -24,12 +26,13 @@ node scripts/release/capture-readme-screenshots.mjs
 
 - `docs/images/01-home-workbench.webp`
 - `docs/images/02-generation-workbench.webp`
-- `docs/images/03-artifact-preview.webp`
-- `docs/images/04-marketplace.webp`
-- `docs/images/05-admin-overview.webp`
-- `docs/images/06-provider-routing.webp`
-- `docs/images/07-prompt-versioning.webp`
-- `docs/images/08-model-call-audit.webp`
+- `docs/images/03-generated-site-preview.webp`
+- `docs/images/04-artifact-workbench.webp`
+- `docs/images/05-marketplace.webp`
+- `docs/images/06-admin-overview.webp`
+- `docs/images/07-provider-routing.webp`
+- `docs/images/08-prompt-versioning.webp`
+- `docs/images/09-model-call-audit.webp`
 - `docs/images/codeforge-overview.webp`
 - `docs/images/social-preview.png`
 

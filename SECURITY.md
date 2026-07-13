@@ -1,31 +1,22 @@
-# 安全策略
+# Security Policy
 
-## 支持版本
+## Reporting Vulnerabilities
 
-当前公开版本为 `v1.0.0`。安全修复优先面向最新公开版本。
+Report security vulnerabilities privately through GitHub Private Vulnerability Reporting:
 
-## 报告方式
+https://github.com/18307519324az/CodeForge-AI/security/advisories/new
 
-请通过 GitHub Security Advisory 或 Issue 报告安全问题。报告中请包含：
+Do not open a public Issue for an unfixed vulnerability. Do not include real provider keys, JWTs, cookies, database passwords, user data, local storage state, storage paths, or complete system prompts in any public report.
 
-- 影响范围
-- 复现步骤
-- 预期行为与实际行为
-- 已确认不会包含真实密钥、Token、Cookie 或用户隐私数据的证据
+Public Issues are only for ordinary non-security bugs.
 
-## 敏感信息处理
+## Supported Version
 
-- 不要在公开 Issue、PR、截图或日志中发布真实密钥、数据库密码、JWT、访问 Token、Cookie 或系统 Prompt 明文。
-- 发现泄露后应立即吊销对应凭据，并在修复中移除泄露内容和传播路径。
-- 示例配置只能使用占位值。
+| Version | Support |
+| --- | --- |
+| v1.0.1 | Supported |
+| v1.0.0 | Supported for upgrade and audit reference |
 
-## 关注边界
+## Disclosure Handling
 
-安全评审重点包括：
-
-- IDOR 与跨租户访问
-- Prompt 明文泄露
-- Provider 凭据泄露
-- path traversal 与 zip slip
-- 导出包、市场发布和静态预览的版本绑定
-- migration checksum 与 schema drift
+Reports are triaged for authentication, authorization, prompt disclosure, provider credential handling, artifact storage, marketplace publication, export package handling, migration safety, and audit log exposure.

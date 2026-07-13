@@ -1,21 +1,33 @@
-# 安全模型
+# Security Model
 
-## 授权边界
+## Authorization Boundary
 
-应用、应用版本、生成文件、导出包和市场发布条目按 Owner/Editor/Admin 权限校验。公开市场接口只能访问已发布且未归档的条目。
+Private apps, app versions, generated files, export packages, and marketplace publication records are read through owner/workspace/app/version/package binding checks. Admin authority does not remove archived/unpublished checks or storage path boundaries.
 
-## Prompt 与模型调用
+## Prompt and Model Calls
 
-生成任务持久化 `templateId` 和 `templateVersionId`。模型调用日志记录模板身份、调用状态和最终 outgoing prompt 的指纹，不向普通 API 返回完整系统 Prompt。
+Generation tasks persist `templateId` and `templateVersionId`. Runtime calls load the fixed version for async execution and retries. Model call logs store template identity and prompt fingerprints, not full system prompts.
 
-## 路径与文件
+## Storage Path Boundary
 
-生成产物路径需要逐段校验，拒绝 `..`、绝对路径、Windows drive、UNC 和 NUL。最终路径需要经过 normalize 并确认仍在版本根目录内，符号链接逃逸应被拒绝。
+Generated artifact paths are validated segment by segment. `..`, absolute paths, Windows drives, UNC paths, and NUL bytes are rejected. Final paths are normalized and constrained to the version root.
 
-## 导出与市场
+## Preview
 
-导出包绑定应用版本，市场发布条目固定 `versionId`。preview、detail 和 download 读取同一个 pinned version，并在读取时检查 archived/unpublished 状态。
+Preview tokens are issued for exact `versionId` values. Preview APIs serve files by version and relative file path, never by raw storage path.
 
-## 审计日志
+## Export and Marketplace
 
-审计日志用于记录发布、撤销、归档、Provider 变更和管理操作。日志不应包含完整 Prompt、密钥、Token、服务端路径或用户密码。
+Export packages bind app, version, and package identity. Marketplace publications pin a `versionId`; detail, preview, and download use that same pinned version and enforce archived/unpublished state on every read.
+
+## Audit Safety
+
+Audit logs record actor, action, object identity, timestamps, and safe metadata. They must not include provider keys, JWTs, cookies, full prompts, local paths, or user passwords.
+
+## Vulnerability Reporting
+
+Security vulnerabilities must be reported privately through:
+
+https://github.com/18307519324az/CodeForge-AI/security/advisories/new
+
+Public Issues are only for ordinary non-security bugs.

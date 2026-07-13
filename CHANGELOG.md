@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.1] - 2026-07-13
+
+### Fixed
+
+- Added reproducible B33-based fresh MySQL bootstrap.
+- Corrected local setup and migration documentation.
+- Prevented Provider secrets from appearing in development process command lines.
+- Replaced artifact screenshot references with a real generated website preview.
+- Restricted vulnerability reporting to private GitHub security channels.
+
+### Improved
+
+- Expanded Chinese and English README documentation.
+- Added complete architecture and product tour documentation.
+- Added Fresh Bootstrap CI gate.
+- Added generated-preview evidence and screenshot validation.
+- Added repository Social Preview.
+
 ## 1.0.0 - Initial Public Release
 
 - 发布 CodeForge AI 全栈源码：Spring Boot 后端、Vue 3 前端、MySQL/Redis 本地运行路径。

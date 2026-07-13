@@ -1,24 +1,30 @@
-# Docker 目录说明
+# Docker
 
-当前仓库的根目录 `docker-compose.yml` 只用于启动本地基础设施：
+`docker-compose.yml` provides local infrastructure only:
 
-- MySQL 8.0
+- MySQL 8
 - Redis 7
 
-它不会构建或启动 Spring Boot 后端，也不会构建或启动 Vue 前端。
+It does not build or run the Spring Boot backend, and it does not build or run the Vue frontend.
 
-## 本地基础设施启动
+## Local Infrastructure
 
 ```powershell
 docker compose up -d mysql redis
 ```
 
-后端仍从仓库根目录通过 Maven Wrapper 启动：
+Then initialize the database with the official Fresh Bootstrap script:
 
 ```powershell
-powershell -File .\scripts\dev-start.ps1 -Profile local -BackendPort 8150 -FrontendPort 5182
+powershell -File .\scripts\db\bootstrap-fresh-database.ps1 -EnvFile .env.local -ConfirmCreate
 ```
 
-## 后续生产化缺口
+Start application processes from the repository root:
 
-若要生产部署，需要补充独立的后端镜像、前端静态资源镜像、反向代理配置、HTTPS、对象存储、密钥托管和日志审计链路。
+```powershell
+powershell -File .\scripts\dev-start.ps1 -Profile local -EnvFile .env.local -BackendPort 8150 -FrontendPort 5182
+```
+
+## Production Gap
+
+Production deployment still requires a hardened backend image, static frontend hosting, reverse proxy, TLS, object storage policy, secret management, backup strategy, and audit log retention.

@@ -1,26 +1,73 @@
-# 配置说明
+# Configuration
 
-所有真实密钥都应通过环境变量或受控密钥系统注入，不应提交到 Git。
+All real secrets must come from `.env.local`, process environment, or a managed secret system. They must not be committed, logged, pasted into Issues, or shown in screenshots.
 
-| 变量 | 示例 | 说明 |
+## Env File
+
+Copy the sample file:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+Both `scripts/db/bootstrap-fresh-database.ps1` and `scripts/dev-start.ps1` load `.env.local` through `scripts/lib/EnvFile.ps1`. The loader accepts `KEY=VALUE`, comments, blank lines, and simple quoted values. It rejects PowerShell expressions, command substitution, pipes, script blocks, duplicate variables, and unsupported variable names.
+
+## Required Local Values
+
+| Variable | Purpose |
+| --- | --- |
+| `MYSQL_ROOT_PASSWORD` | Docker MySQL root password |
+| `MYSQL_PASSWORD` | Docker app-user password |
+| `DB_PASSWORD` | Backend database password |
+| `JWT_SECRET` | JWT signing secret |
+| `CODEFORGE_CREDENTIAL_MASTER_KEY` | Provider credential encryption key |
+
+## Database
+
+| Variable | Example | Purpose |
 | --- | --- | --- |
-| `DB_HOST` | `127.0.0.1` | MySQL 主机 |
-| `DB_PORT` | `3306` | MySQL 端口 |
-| `DB_NAME` | `codeforge_ai` | 数据库名 |
-| `DB_USERNAME` | `codeforge_ai_user` | 应用数据库用户 |
-| `DB_PASSWORD` | `<your-db-password>` | 应用数据库密码 |
-| `REDIS_HOST` | `127.0.0.1` | Redis 主机 |
-| `REDIS_PORT` | `6379` | Redis 端口 |
-| `REDIS_PASSWORD` | `<optional>` | Redis 密码 |
-| `JWT_SECRET` | `<at-least-32-characters>` | JWT 签名密钥 |
-| `AI_PROVIDER` | `auto` | Provider 路由模式 |
-| `OPENAI_API_KEY` | `<openai-api-key>` | OpenAI-compatible 密钥 |
-| `DEEPSEEK_API_KEY` | `<deepseek-api-key>` | DeepSeek 密钥 |
-| `CODEFORGE_CREDENTIAL_MASTER_KEY` | `<32-byte-secret>` | 数据库加密凭据主密钥 |
-| `CODEFORGE_FORCE_RULE_ONLY` | `true` | 强制规则生成，不调用真实模型 |
+| `DB_HOST` | `127.0.0.1` | MySQL host |
+| `DB_PORT` | `3306` | MySQL port |
+| `DB_NAME` | `codeforge_ai` | Local schema name |
+| `DB_USERNAME` | `codeforge_ai_user` | App database user |
+| `DB_PASSWORD` | `<local-password>` | App database password |
 
-## 本地开发建议
+## Redis
 
-- 默认使用 `CODEFORGE_FORCE_RULE_ONLY=true` 完成 UI、权限和产物链路验证。
-- 需要真实模型调用时，只在当前 shell 注入 Provider 密钥。
-- 不要把 `.env.local`、截图、日志或命令历史中的密钥提交到仓库。
+| Variable | Example | Purpose |
+| --- | --- | --- |
+| `REDIS_HOST` | `127.0.0.1` | Redis host |
+| `REDIS_PORT` | `6379` | Redis port |
+| `REDIS_PASSWORD` | empty | Optional local password |
+
+## Provider
+
+For deterministic local validation:
+
+```dotenv
+CODEFORGE_FORCE_RULE_ONLY=true
+AI_PROVIDER=rule
+```
+
+For real provider calls:
+
+```dotenv
+CODEFORGE_FORCE_RULE_ONLY=false
+AI_PROVIDER=auto
+```
+
+Then configure the matching provider key. Do not put provider keys in command-line arguments.
+
+## Fresh Database
+
+Use:
+
+```powershell
+powershell -File .\scripts\db\bootstrap-fresh-database.ps1 -EnvFile .env.local -ConfirmCreate
+```
+
+Expected output includes `B33_BASELINE_APPLIED`, `FLYWAY_VALIDATE_PASS`, and `SCHEMA_STATUS=READY`.
+
+## Legacy Recovery
+
+`scripts/db/apply-local-migrations.ps1` is only for manually reviewed `EXPERIMENTAL_LEGACY_RECOVERY` and requires `-ConfirmLegacyRecovery`.

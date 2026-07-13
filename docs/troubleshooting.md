@@ -1,27 +1,50 @@
-# 故障排查
+# Troubleshooting
 
-## Schema Gate 返回 MISSING
+## Schema Checker Returns MISSING
 
-表示当前数据库缺少必需对象或 Flyway history。全新本地库可先运行：
+For a new local database, run:
 
 ```powershell
-powershell -File .\scripts\db\apply-local-migrations.ps1
-powershell -File .\scripts\db\check-local-schema.ps1
+powershell -File .\scripts\db\bootstrap-fresh-database.ps1 -EnvFile .env.local -ConfirmCreate
 ```
 
-## Schema Gate 返回 HISTORY_MISMATCH
+## Schema Checker Returns HISTORY_MISMATCH
 
-表示 schema 和 history 不一致。不要执行 `flyway repair`，也不要修改已提交 migration 的 checksum。请先比对目标库 history 与当前 `sql/` 目录。
+Stop and investigate. Do not run `flyway repair`, do not edit migration checksums, and do not run legacy recovery without reviewing the database history.
 
-## 前端无法调用后端
+## TARGET_DATABASE_NOT_EMPTY or NON_EMPTY_UNMANAGED_DATABASE
 
-确认 `scripts/dev-start.ps1` 输出的端口：
+The selected database already has tables but is not recognized as a managed CodeForge schema. Use a new local database name or inspect it manually.
 
-- 后端：`http://127.0.0.1:8150/api`
-- 前端：`http://127.0.0.1:5182`
+## Provider Calls Fail
 
-确认前端启动时注入的 `VITE_API_BASE_URL` 指向后端 `/api/v1`。
+Use Rule Mode for local validation:
 
-## 真实模型调用失败
+```dotenv
+CODEFORGE_FORCE_RULE_ONLY=true
+AI_PROVIDER=rule
+```
 
-先设置 `CODEFORGE_FORCE_RULE_ONLY=true` 验证业务链路。若规则生成可用，再检查 Provider 状态、路由策略和对应 API Key 环境变量。
+For AI_DIRECT, verify the provider key is present in `.env.local` and never appears in command-line arguments or logs.
+
+## Preview Fails
+
+Confirm the requested `versionId` belongs to the app and the preview token was issued through:
+
+```text
+POST /api/v1/apps/{appId}/versions/{versionId}/preview-token
+```
+
+## Ports Are Occupied
+
+Run:
+
+```powershell
+powershell -File .\scripts\dev-status.ps1
+```
+
+Then stop only the current worktree with:
+
+```powershell
+powershell -File .\scripts\dev-stop.ps1
+```
