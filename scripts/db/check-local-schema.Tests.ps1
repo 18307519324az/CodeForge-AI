@@ -83,6 +83,9 @@ $spacePath = 'D:\MySQL\MySQL Server 8.0\bin\mysql.exe'
 } -Exe $spacePath | Out-Null
 Assert-Equals $spacePath $invokedExe 'MysqlPathWithSpacesIsSupportedTest'
 
+$scriptContentAfterPathCheck = Get-Content -LiteralPath $checkScript -Raw
+Assert-True ($scriptContentAfterPathCheck -match 'Select-Object -First 1') 'MultipleMysqlCommandsUseFirstApplicationTest'
+
 function Get-MysqlExecutable {
     throw 'MYSQL_CLIENT_NOT_FOUND'
 }

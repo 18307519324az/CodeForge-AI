@@ -22,7 +22,7 @@ $script:RequiredIndexes = @(
 )
 
 function Get-MysqlExecutable {
-    $mysqlCommand = Get-Command mysql -CommandType Application -ErrorAction SilentlyContinue
+    $mysqlCommand = Get-Command mysql -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $mysqlCommand) {
         throw 'MYSQL_CLIENT_NOT_FOUND'
     }
