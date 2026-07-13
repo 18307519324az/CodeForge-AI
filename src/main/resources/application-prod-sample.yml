@@ -1,0 +1,80 @@
+# 线上配置文件模板
+# 仅用于演示生产环境配置结构
+# 所有账号、密码、密钥都必须替换为自有配置
+spring:
+  # mysql
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://<your-host>:3306/codeforge_ai
+    username: codeforge_ai_user
+    password: please_change_me
+  # redis
+  data:
+    redis:
+      host: <your-host>
+      port: 6379
+      database: 0
+      password: please_change_me
+      ttl: 3600
+# AI
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: https://api.deepseek.com
+      api-key: please_change_me
+      model-name: deepseek-chat
+      max-tokens: 8192
+      log-requests: false
+      log-responses: false
+    streaming-chat-model:
+      base-url: https://api.deepseek.com
+      api-key: please_change_me
+      model-name: deepseek-chat
+      max-tokens: 8192
+      log-requests: false
+      log-responses: false
+    # 推理 AI 模型配置（用于复杂的推理任务）
+    reasoning-streaming-chat-model:
+      base-url: https://api.deepseek.com
+      api-key: please_change_me
+      model-name: deepseek-chat
+      max-tokens: 8192
+      temperature: 0.1
+      log-requests: false
+      log-responses: false
+    # 智能路由 AI 模型配置
+    routing-chat-model:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: please_change_me
+      model-name: qwen-turbo
+      max-tokens: 100
+      log-requests: false
+      log-responses: false
+# 添加 COS 对象存储配置（需要从腾讯云获取）
+cos:
+  client:
+    host: <your-custom-domain.com>
+    secretId: please_change_me
+    secretKey: please_change_me
+    region: <your-region>
+    bucket: <your-bucket-name>
+# 阿里云 DashScope 配置
+dashscope:
+  api-key: please_change_me
+  image-model: wan2.2-t2i-flash
+# Pexels 图片搜索配置
+pexels:
+  api-key: please_change_me
+# 生产环境关闭日志
+mybatis-flex:
+  configuration:
+    log-impl: ''
+# 接口文档配置
+knife4j:
+  basic:
+    enable: true
+    username: please_change_me
+    password: please_change_me
+# 部署路径
+code:
+  deploy-host: http://<your-host>/dist

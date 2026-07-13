@@ -1,0 +1,33 @@
+# Copy to application-local.yml (gitignored) for local MySQL canonical dev.
+spring:
+  session:
+    store-type: none
+  data:
+    redis:
+      repositories:
+        enabled: false
+  sql:
+    init:
+      mode: never
+  flyway:
+    # Legacy MySQL flyway history may diverge from filesystem migrations.
+    # Re-enable after running scripts/mysql-flyway-catchup.sql manually.
+    enabled: false
+    locations: filesystem:sql/migrations,filesystem:sql/mysql-local
+    baseline-on-migrate: true
+    clean-disabled: true
+    validate-on-migrate: false
+    out-of-order: true
+    ignore-migration-patterns: "*:missing"
+
+mybatis-flex:
+  configuration:
+    map-underscore-to-camel-case: true
+
+codeforge:
+  ai:
+    provider: ${AI_PROVIDER:auto}
+    base-url: ${AI_BASE_URL:https://api.deepseek.com}
+    model: ${AI_MODEL:deepseek-v4-pro}
+  generation:
+    force-rule-only: false

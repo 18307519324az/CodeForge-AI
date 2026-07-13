@@ -1,0 +1,35 @@
+name: Security review
+description: 报告安全边界问题
+title: "[Security] "
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: 请不要公开真实密钥、Token、Cookie、用户隐私数据或完整系统 Prompt。
+  - type: textarea
+    id: scope
+    attributes:
+      label: 影响范围
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 证据
+      description: 可提供脱敏后的请求、响应、日志或截图。
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 区域
+      options:
+        - Auth
+        - Prompt
+        - Provider
+        - Artifact
+        - Marketplace
+        - Migration
+        - Other
+    validations:
+      required: true

@@ -1,0 +1,15 @@
+export const adminEmptyMessages = {
+  default: '暂无数据',
+  filtered: '未找到符合条件的数据',
+  filteredHint: '请尝试放宽筛选条件或重置筛选',
+  users: '暂无用户',
+  usersHint: '平台尚无注册用户',
+  apps: '暂无应用',
+  appsHint: '尚未创建任何应用',
+  providers: '暂无 Provider',
+  providersHint: '请添加模型供应商以启用 AI 能力',
+  modelLogs: '暂无模型调用记录',
+  modelLogsHint: '平台尚无 AI 模型调用',
+  promptTemplates: '暂无 Prompt 模板',
+  promptTemplatesHint: '创建模板以规范 AI 输出',
+} as const
